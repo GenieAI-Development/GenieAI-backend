@@ -8,11 +8,14 @@ from app.observability.logging import log_event
 from app.schemas.recommendation import (
     ClarificationResponse,
     DeliveryUnavailableResponse,
+    ProductCard,
     RecommendationRequest,
     RuntimeResponse,
+    SmartShoppingResponse,
     TemporaryUnavailableResponse,
     WorkflowMismatchResponse,
 )
+from app.schemas.internal import RerankedCandidate
 from app.sessions.models import RecommendationSession, ProductSearchState
 
 
@@ -69,6 +72,37 @@ class RecommendationOrchestrator:
             request_type=request_type,
             response_type="temporary_unavailable",
             message=message,
+        )
+
+    def _direct_smart_shopping_response(
+        self, request_id: str, session_id: str, candidates: list[RerankedCandidate]
+    ) -> SmartShoppingResponse:
+        selected = candidates[: self.smart_target]
+        products = [
+            ProductCard(
+                product_id=item.verified.product.product_id,
+                name=item.verified.product.name,
+                price_lkr=item.verified.live_price_lkr,
+                image_url=item.verified.image_url,
+                vendor=item.verified.product.vendor,
+                reason="Matched your search and passed cached price and availability checks.",
+            )
+            for item in selected
+        ]
+        response_type = "recommendation" if len(products) >= self.smart_target else "limited_results"
+        message = (
+            "I found the strongest available matches for your request."
+            if products
+            else "I couldn't find an available product that meets all of your requirements."
+        )
+        return SmartShoppingResponse(
+            request_id=request_id,
+            session_id=session_id,
+            request_type="product_recommendation",
+            response_type=response_type,
+            message=message,
+            result_count=len(products),
+            products=products,
         )
 
     async def execute(self, request: RecommendationRequest) -> RuntimeResponse:
@@ -209,52 +243,39 @@ class RecommendationOrchestrator:
             return response
 
         all_verified = {}
-        attempted_ids: set[str] = set()
-        ranked = []
+        ranked: list[RerankedCandidate] = []
         retrieval_ever_succeeded = False
         try:
-            for depth in list(dict.fromkeys([self.fused_top_k, 40, 60])):
-                new_hits = []
-                for plan in plans:
-                    expanded = plan.model_copy(update={"candidate_limit": depth})
-                    try:
-                        with trace.stage("hybrid_retrieval"):
-                            hits = await self.retriever.retrieve(expanded)
-                        retrieval_ever_succeeded = True
-                    except Exception:
-                        if plan.required:
-                            raise
-                        continue
-                    for hit in hits:
-                        if hit.product_id in attempted_ids:
-                            continue
-                        attempted_ids.add(hit.product_id)
-                        new_hits.append(hit)
-                if not new_hits:
-                    break
-                with trace.stage("live_verification"):
-                    verified = await self.verifier.verify(
-                        new_hits, understanding.volatile_constraints
-                    )
+            for plan in plans:
+                expanded = plan.model_copy(update={"candidate_limit": 60})
+                try:
+                    with trace.stage("hybrid_retrieval"):
+                        hits = await self.retriever.retrieve(expanded)
+                    retrieval_ever_succeeded = True
+                except Exception:
+                    if plan.required:
+                        raise
+                    continue
+                with trace.stage("cached_product_verification"):
+                    verified = await self.verifier.verify(hits, understanding.volatile_constraints)
                 for item in verified:
                     all_verified[item.product.product_id] = item
-                with trace.stage("reranking"):
-                    ranked = await self.reranker.rerank(
-                        understanding, list(all_verified.values())
+            ranked = sorted(
+                (
+                    RerankedCandidate(
+                        verified=item,
+                        relevance_score=item.retrieval.rrf_score,
+                        reason="Matched your search and passed cached price and availability checks.",
                     )
-                log_event(
-                    "reranking_outcome",
-                    verified_candidate_count=len(all_verified),
-                    semantic_eligible_count=len(ranked),
-                    expansion_depth=depth,
-                )
-                target = (
-                    gift_state.item_count or 4
-                    if request.request_type == "gift_box"
-                    else self.smart_target
-                )
-                if len(ranked) >= target:
-                    break
+                    for item in all_verified.values()
+                ),
+                key=lambda item: (-item.relevance_score, item.verified.product.product_id),
+            )
+            log_event(
+                "direct_retrieval_outcome",
+                retrieved_candidate_limit=60,
+                verified_candidate_count=len(all_verified),
+            )
         except Exception as exc:
             category = (
                 "RERANKER_FAILURE"
@@ -286,9 +307,7 @@ class RecommendationOrchestrator:
             return response
 
         if request.request_type == "product_recommendation":
-            response = self.smart_shopping.build_response(
-                request_id=request_id, session_id=session.session_id, candidates=ranked
-            )
+            response = self._direct_smart_shopping_response(request_id, session.session_id, ranked)
             session.product_search_state = ProductSearchState(
                 query_understanding=understanding.model_dump(mode="json"),
                 previous_product_ids=[item.product_id for item in response.products],

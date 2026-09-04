@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,15 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str | None = None
+    supabase_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"),
+    )
+    supabase_secret_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_SECRET_KEY"),
+    )
+    supabase_product_table: str = "kapruka_gift_products"
     kapruka_mcp_url: str | None = "https://mcp.kapruka.com/mcp"
     kapruka_mcp_command: str | None = None
     kapruka_mcp_args: list[str] = Field(default_factory=list)

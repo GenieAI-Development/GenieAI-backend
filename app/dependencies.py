@@ -21,6 +21,7 @@ from app.integrations.kapruka.client import McpKaprukaClient
 from app.integrations.llm.client import OpenAIStructuredLLMClient, UnavailableLLMClient
 from app.integrations.llm.reliable_executor import ReliableLLMExecutor
 from app.integrations.qdrant.client import QdrantVectorStore
+from app.integrations.supabase.product_cache import SupabaseProductCache
 from app.optimizers.gift_box_optimizer import GiftBoxOptimizer
 from app.orchestration.recommendation_orchestrator import RecommendationOrchestrator
 from app.repositories.catalogue_repository import JsonCatalogueRepository
@@ -36,6 +37,7 @@ class Container:
     sessions: InMemorySessionStore
     repository: JsonCatalogueRepository
     kapruka: McpKaprukaClient
+    product_cache: SupabaseProductCache
     qdrant_store: QdrantVectorStore
     product_ingestion: ProductIngestion
     visual_importer: VisualInterpretationImporter
@@ -44,6 +46,7 @@ class Container:
 
     async def close(self) -> None:
         await self.kapruka.close()
+        await self.product_cache.close()
         await self.qdrant_store.close()
 
 
@@ -64,6 +67,12 @@ def build_container(settings: Settings) -> Container:
         settings.qdrant_api_key,
         settings.qdrant_collection_prefix,
         settings.embedding_dimension,
+        timeout_seconds=settings.qdrant_timeout_seconds,
+    )
+    product_cache = SupabaseProductCache(
+        settings.supabase_url,
+        settings.supabase_secret_key,
+        settings.supabase_product_table,
         timeout_seconds=settings.qdrant_timeout_seconds,
     )
     if settings.openai_api_key:
@@ -102,7 +111,7 @@ def build_container(settings: Settings) -> Container:
         planner=RecommendationPlanner(executor, settings.fused_top_k),
         retriever=hybrid,
         verifier=LiveProductVerifier(
-            kapruka,
+            product_cache,
             repository,
             settings.mcp_verification_concurrency,
             settings.mcp_broad_failure_ratio,
@@ -121,6 +130,7 @@ def build_container(settings: Settings) -> Container:
         sessions=sessions,
         repository=repository,
         kapruka=kapruka,
+        product_cache=product_cache,
         qdrant_store=qdrant_store,
         product_ingestion=ProductIngestion(repository, kapruka, settings.mcp_verification_concurrency),
         visual_importer=VisualInterpretationImporter(repository),

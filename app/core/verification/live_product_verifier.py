@@ -5,6 +5,7 @@ from contextlib import nullcontext
 
 from app.integrations.kapruka.client import KaprukaClient
 from app.integrations.kapruka.normalizer import extract_live_product
+from app.integrations.supabase.product_cache import CachedProductNotFoundError
 from app.repositories.catalogue_repository import CatalogueRepository
 from app.observability.logging import log_event
 from app.schemas.internal import RetrievalHit, VerifiedCandidate, VolatileConstraints
@@ -54,13 +55,20 @@ class LiveProductVerifier:
                 "kapruka_mcp_session_close_failed",
                 failure_type=type(exc).__name__,
             )
-        failures = sum(result[4] is not None for result in results)
+        failures = sum(
+            result[4] is not None and not isinstance(result[4], CachedProductNotFoundError)
+            for result in results
+        )
+        cache_misses = sum(
+            isinstance(result[4], CachedProductNotFoundError) for result in results
+        )
         successes = len(results) - failures
         log_event(
             "live_verification_summary",
             attempted=len(results),
             successful_responses=successes,
             failed_responses=failures,
+            cache_misses=cache_misses,
         )
         if results and (
             successes == 0
@@ -71,6 +79,9 @@ class LiveProductVerifier:
         catalogues = {}
         verified: list[VerifiedCandidate] = []
         for hit, price, in_stock, image_url, error in results:
+            if isinstance(error, CachedProductNotFoundError):
+                log_event("cached_product_not_found", product_id=hit.product_id, category=hit.category)
+                continue
             if error is not None or not in_stock or image_url is None or price is None:
                 continue
             if constraints.min_price is not None and price < constraints.min_price:
