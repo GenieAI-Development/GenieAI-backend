@@ -1,0 +1,2 @@
+"""Derived search-index construction."""
+
