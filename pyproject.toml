@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "genieai-recommendation-service"
+version = "0.1.0"
+description = "GenieAI Kapruka recommendation backend"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.116.1",
+  "uvicorn[standard]==0.35.0",
+  "pydantic==2.11.7",
+  "pydantic-settings==2.10.1",
+  "openai==1.99.9",
+  "qdrant-client==1.19.0",
+  "bm25s==0.2.14",
+  "mcp==1.12.4",
+  "tenacity==9.1.2",
+  "httpx==0.28.1",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest==8.4.1",
+  "pytest-asyncio==1.1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"

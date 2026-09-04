@@ -1,6 +1,10 @@
-.venv/
 .env
+.venv/
 .idea/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.coverage
+htmlcov/
+data/bm25/*
+!data/bm25/.gitkeep
