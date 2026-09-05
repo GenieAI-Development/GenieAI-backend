@@ -71,7 +71,7 @@ Successful responses return `recommendation` when 12 products are available, or 
 Each product card contains:
 
 ```text
-product_id, name, price_lkr, image_url, vendor, reason
+product_id, name, description, price_lkr, image_url, vendor
 ```
 
 ## Search and filtering behaviour
@@ -79,7 +79,7 @@ product_id, name, price_lkr, image_url, vendor, reason
 - The original message is used for dense and BM25 retrieval.
 - The planner selects the applicable product category/collection.
 - Retrieval is widened to **60 candidates** once; it does not retry with deeper pools.
-- Supabase filters candidates using cached `in_stock`, price range, and a usable image.
+- Supabase filters candidates using cached `in_stock`, price range, and a usable image. Its cached `description` is returned to the frontend as the product description.
 - Missing Supabase records are skipped, not treated as a system-wide failure.
 - Results are sorted by RRF score and the first 12 are returned.
 

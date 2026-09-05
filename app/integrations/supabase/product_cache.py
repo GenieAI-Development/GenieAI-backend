@@ -45,7 +45,7 @@ class SupabaseProductCache:
         response = await self._client.get(
             self.table,
             params={
-                "select": "product_id,price_amount,in_stock,image_url,images,product_url",
+                "select": "product_id,description,price_amount,in_stock,image_url,images,product_url",
                 "product_id": f"eq.{product_id}",
                 "limit": 1,
             },
@@ -62,6 +62,7 @@ class SupabaseProductCache:
             images = [record["image_url"]]
         return {
             "id": product_id,
+            "description": record.get("description") if isinstance(record.get("description"), str) else None,
             "price": {"amount": record.get("price_amount")},
             "in_stock": record.get("in_stock"),
             "images": images,

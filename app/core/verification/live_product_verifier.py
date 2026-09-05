@@ -38,9 +38,12 @@ class LiveProductVerifier:
                 try:
                     payload = await self.kapruka.get_product(hit.product_id)
                     price, in_stock, image_url = extract_live_product(payload)
-                    return hit, price, in_stock, image_url, None
+                    description = payload.get("description")
+                    if not isinstance(description, str):
+                        description = None
+                    return hit, price, in_stock, image_url, description, None
                 except Exception as exc:
-                    return hit, None, None, None, exc
+                    return hit, None, None, None, None, exc
 
         scope_factory = getattr(self.kapruka, "session_scope", None)
         scope = scope_factory() if callable(scope_factory) else nullcontext()
@@ -56,11 +59,11 @@ class LiveProductVerifier:
                 failure_type=type(exc).__name__,
             )
         failures = sum(
-            result[4] is not None and not isinstance(result[4], CachedProductNotFoundError)
+            result[5] is not None and not isinstance(result[5], CachedProductNotFoundError)
             for result in results
         )
         cache_misses = sum(
-            isinstance(result[4], CachedProductNotFoundError) for result in results
+            isinstance(result[5], CachedProductNotFoundError) for result in results
         )
         successes = len(results) - failures
         log_event(
@@ -78,7 +81,7 @@ class LiveProductVerifier:
 
         catalogues = {}
         verified: list[VerifiedCandidate] = []
-        for hit, price, in_stock, image_url, error in results:
+        for hit, price, in_stock, image_url, cached_description, error in results:
             if isinstance(error, CachedProductNotFoundError):
                 log_event("cached_product_not_found", product_id=hit.product_id, category=hit.category)
                 continue
@@ -100,6 +103,7 @@ class LiveProductVerifier:
                     category=hit.category,
                     live_price_lkr=price,
                     image_url=image_url,
+                    cached_description=cached_description,
                     retrieval=hit,
                 )
             )

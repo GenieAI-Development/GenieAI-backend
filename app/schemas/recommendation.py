@@ -50,7 +50,7 @@ class ProductCard(BaseModel):
     price_lkr: int = Field(gt=0)
     image_url: str = Field(min_length=1)
     vendor: str
-    reason: str = Field(min_length=1, max_length=220)
+    description: str | None = None
 
 
 class ResponseBase(BaseModel):

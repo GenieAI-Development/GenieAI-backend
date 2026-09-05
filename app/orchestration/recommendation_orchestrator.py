@@ -83,7 +83,7 @@ class RecommendationOrchestrator:
                 price_lkr=item.verified.live_price_lkr,
                 image_url=item.verified.image_url,
                 vendor=item.verified.product.vendor,
-                reason="Matched your search and passed cached price and availability checks.",
+                description=item.verified.cached_description,
             )
             for item in selected
         ]
