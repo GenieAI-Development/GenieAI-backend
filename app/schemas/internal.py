@@ -92,6 +92,8 @@ class VerifiedCandidate(BaseModel):
     category: str
     live_price_lkr: int = Field(gt=0)
     image_url: str
+    cached_name: str | None = None
+    cached_vendor: str | None = None
     cached_description: str | None = None
     retrieval: RetrievalHit
 

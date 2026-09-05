@@ -49,7 +49,7 @@ class ProductCard(BaseModel):
     name: str
     price_lkr: int = Field(gt=0)
     image_url: str = Field(min_length=1)
-    vendor: str
+    vendor: str | None = None
     description: str | None = None
 
 

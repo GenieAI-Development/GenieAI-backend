@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("SUPABASE_SECRET_KEY"),
     )
-    supabase_product_table: str = "kapruka_gift_products"
+    supabase_product_table: str = "products"
     kapruka_mcp_url: str | None = "https://mcp.kapruka.com/mcp"
     kapruka_mcp_command: str | None = None
     kapruka_mcp_args: list[str] = Field(default_factory=list)

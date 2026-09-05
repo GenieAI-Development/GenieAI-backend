@@ -20,7 +20,7 @@ class SupabaseProductCache:
         self,
         url: str | None,
         secret_key: str | None,
-        table: str = "kapruka_gift_products",
+        table: str = "products",
         timeout_seconds: float = 10.0,
     ) -> None:
         self.table = table
@@ -45,7 +45,7 @@ class SupabaseProductCache:
         response = await self._client.get(
             self.table,
             params={
-                "select": "product_id,description,price_amount,in_stock,image_url,images,product_url",
+                "select": "product_id,name,description,display_description,vendor,price_lkr,main_image_url,image_urls,is_active",
                 "product_id": f"eq.{product_id}",
                 "limit": 1,
             },
@@ -55,16 +55,20 @@ class SupabaseProductCache:
         if not isinstance(rows, list) or not rows:
             raise CachedProductNotFoundError(f"cached product is missing: {product_id}")
         record = rows[0]
-        images = record.get("images")
+        images = record.get("image_urls")
         if not isinstance(images, list):
             images = []
-        if not images and isinstance(record.get("image_url"), str):
-            images = [record["image_url"]]
+        if not images and isinstance(record.get("main_image_url"), str):
+            images = [record["main_image_url"]]
+        description = record.get("display_description")
+        if not isinstance(description, str) or not description.strip():
+            description = record.get("description")
         return {
             "id": product_id,
-            "description": record.get("description") if isinstance(record.get("description"), str) else None,
-            "price": {"amount": record.get("price_amount")},
-            "in_stock": record.get("in_stock"),
+            "name": record.get("name") if isinstance(record.get("name"), str) else None,
+            "description": description.strip() if isinstance(description, str) else None,
+            "vendor": record.get("vendor") if isinstance(record.get("vendor"), str) else None,
+            "price": {"amount": record.get("price_lkr")},
+            "in_stock": record.get("is_active"),
             "images": images,
-            "product_url": record.get("product_url"),
         }

@@ -79,10 +79,10 @@ class RecommendationOrchestrator:
         products = [
             ProductCard(
                 product_id=item.verified.product.product_id,
-                name=item.verified.product.name,
+                name=item.verified.cached_name or item.verified.product.name,
                 price_lkr=item.verified.live_price_lkr,
                 image_url=item.verified.image_url,
-                vendor=item.verified.product.vendor,
+                vendor=item.verified.cached_vendor or item.verified.product.vendor,
                 description=item.verified.cached_description,
             )
             for item in selected

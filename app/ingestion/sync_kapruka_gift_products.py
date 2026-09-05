@@ -1,11 +1,11 @@
-"""Backfill Supabase gift-product records for cakes missing from its cache.
+"""Backfill Supabase ``products`` records for cakes missing from its cache.
 
 Run with the project's runtime dependencies installed:
 
     python -m app.ingestion.sync_kapruka_gift_products
 
 The script reads canonical product IDs from ``data/catalogue/cakes.json``, finds
-the IDs absent from ``kapruka_gift_products``, fetches only those products from
+the IDs absent from ``products``, fetches only those products from
 Kapruka MCP, and upserts the resulting cache records into Supabase.
 """
 
@@ -24,9 +24,7 @@ from app.config.settings import Settings
 from app.repositories.catalogue_repository import JsonCatalogueRepository
 
 
-SUPABASE_TABLE = "kapruka_gift_products"
-ASSIGNED_CATEGORY = "cakes_and_desserts"
-MATCHED_KEYWORD = "cakes"
+SUPABASE_TABLE = "products"
 PAGE_SIZE = 1_000
 
 
@@ -58,21 +56,7 @@ def _primary_image(images: object) -> str | None:
     return None
 
 
-def _product_url(payload: dict[str, Any]) -> str | None:
-    for key in ("product_url", "url", "canonical_url", "link"):
-        value = payload.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    urls = payload.get("urls")
-    if isinstance(urls, dict):
-        for key in ("product", "canonical", "url"):
-            value = urls.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-    return None
-
-
-def _price_amount(payload: dict[str, Any]) -> str | None:
+def _price_amount(payload: dict[str, Any]) -> int | None:
     price = payload.get("price")
     amount = price.get("amount") if isinstance(price, dict) else None
     if amount is None:
@@ -81,29 +65,27 @@ def _price_amount(payload: dict[str, Any]) -> str | None:
         value = Decimal(str(amount))
     except (InvalidOperation, ValueError):
         return None
-    return str(value) if value > 0 else None
+    return int(value) if value > 0 else None
 
 
 def _record(product_id: str, fallback_name: str, payload: dict[str, Any]) -> dict[str, Any]:
     images = payload.get("images")
-    images = images if isinstance(images, list) else []
-    category = payload.get("category")
+    image_urls = [image for image in images if isinstance(image, str) and image.strip()] if isinstance(images, list) else []
+    description = payload.get("description")
+    description = description.strip() if isinstance(description, str) and description.strip() else fallback_name
+    attributes = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
+    category = payload.get("category") if isinstance(payload.get("category"), dict) else {}
     return {
-        "assigned_category": ASSIGNED_CATEGORY,
         "product_id": product_id,
-        "matched_keyword": MATCHED_KEYWORD,
         "name": payload.get("name") if isinstance(payload.get("name"), str) else fallback_name,
-        "summary": payload.get("summary") if isinstance(payload.get("summary"), str) else None,
-        "description": payload.get("description") if isinstance(payload.get("description"), str) else None,
-        "price_amount": _price_amount(payload),
-        "currency": "LKR",
-        "in_stock": payload.get("in_stock") if isinstance(payload.get("in_stock"), bool) else None,
-        "stock_level": payload.get("stock_level") if isinstance(payload.get("stock_level"), str) else None,
-        "image_url": _primary_image(images),
-        "images": images,
-        "kapruka_category": category if isinstance(category, dict) else None,
-        "product_url": _product_url(payload),
-        "raw_product": payload,
+        "description": description,
+        "display_description": description,
+        "vendor": attributes.get("vendor") if isinstance(attributes.get("vendor"), str) else None,
+        "category": category.get("slug") if isinstance(category.get("slug"), str) else "cakes",
+        "price_lkr": _price_amount(payload),
+        "main_image_url": _primary_image(images),
+        "image_urls": image_urls,
+        "is_active": payload.get("in_stock") if isinstance(payload.get("in_stock"), bool) else True,
     }
 
 
@@ -115,7 +97,6 @@ async def _existing_ids(client: httpx.AsyncClient) -> set[str]:
             SUPABASE_TABLE,
             params={
                 "select": "product_id",
-                "assigned_category": f"eq.{ASSIGNED_CATEGORY}",
                 "offset": offset,
                 "limit": PAGE_SIZE,
             },
@@ -135,7 +116,7 @@ async def _upsert(client: httpx.AsyncClient, records: list[dict[str, Any]]) -> N
         return
     response = await client.post(
         SUPABASE_TABLE,
-        params={"on_conflict": "assigned_category,product_id"},
+        params={"on_conflict": "product_id"},
         headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
         json=records,
     )

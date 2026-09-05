@@ -26,7 +26,7 @@ For a product recommendation, the response is built deterministically. It does n
 - **Supabase**: cached product commerce data used to filter and populate product cards.
 - **Canonical catalogue JSON**: stable product metadata from `data/catalogue/{category}.json`.
 
-The cache table defaults to `kapruka_gift_products`. For each candidate the backend reads `product_id`, `price_amount`, `in_stock`, `image_url`, and `images`.
+The cache table defaults to `products`. For each candidate the backend reads its name, description, vendor, `price_lkr`, `is_active`, `main_image_url`, and `image_urls`.
 
 ## Features intentionally not in the product-recommendation runtime
 
@@ -79,7 +79,7 @@ product_id, name, description, price_lkr, image_url, vendor
 - The original message is used for dense and BM25 retrieval.
 - The planner selects the applicable product category/collection.
 - Retrieval is widened to **60 candidates** once; it does not retry with deeper pools.
-- Supabase filters candidates using cached `in_stock`, price range, and a usable image. Its cached `description` is returned to the frontend as the product description.
+- Supabase filters candidates using `is_active`, price range, and a usable image. It returns `display_description` when present, otherwise `description`.
 - Missing Supabase records are skipped, not treated as a system-wide failure.
 - Results are sorted by RRF score and the first 12 are returned.
 
@@ -95,7 +95,7 @@ QDRANT_URL=...
 QDRANT_API_KEY=...
 SUPABASE_URL=...
 SUPABASE_SECRET_KEY=...
-SUPABASE_PRODUCT_TABLE=kapruka_gift_products
+SUPABASE_PRODUCT_TABLE=products
 ```
 
 `NEXT_PUBLIC_SUPABASE_URL` is also accepted as an alias for `SUPABASE_URL`.

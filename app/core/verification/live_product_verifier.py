@@ -41,9 +41,15 @@ class LiveProductVerifier:
                     description = payload.get("description")
                     if not isinstance(description, str):
                         description = None
-                    return hit, price, in_stock, image_url, description, None
+                    name = payload.get("name")
+                    if not isinstance(name, str):
+                        name = None
+                    vendor = payload.get("vendor")
+                    if not isinstance(vendor, str):
+                        vendor = None
+                    return hit, price, in_stock, image_url, name, vendor, description, None
                 except Exception as exc:
-                    return hit, None, None, None, None, exc
+                    return hit, None, None, None, None, None, None, exc
 
         scope_factory = getattr(self.kapruka, "session_scope", None)
         scope = scope_factory() if callable(scope_factory) else nullcontext()
@@ -59,11 +65,11 @@ class LiveProductVerifier:
                 failure_type=type(exc).__name__,
             )
         failures = sum(
-            result[5] is not None and not isinstance(result[5], CachedProductNotFoundError)
+            result[7] is not None and not isinstance(result[7], CachedProductNotFoundError)
             for result in results
         )
         cache_misses = sum(
-            isinstance(result[5], CachedProductNotFoundError) for result in results
+            isinstance(result[7], CachedProductNotFoundError) for result in results
         )
         successes = len(results) - failures
         log_event(
@@ -81,7 +87,7 @@ class LiveProductVerifier:
 
         catalogues = {}
         verified: list[VerifiedCandidate] = []
-        for hit, price, in_stock, image_url, cached_description, error in results:
+        for hit, price, in_stock, image_url, cached_name, cached_vendor, cached_description, error in results:
             if isinstance(error, CachedProductNotFoundError):
                 log_event("cached_product_not_found", product_id=hit.product_id, category=hit.category)
                 continue
@@ -103,6 +109,8 @@ class LiveProductVerifier:
                     category=hit.category,
                     live_price_lkr=price,
                     image_url=image_url,
+                    cached_name=cached_name,
+                    cached_vendor=cached_vendor,
                     cached_description=cached_description,
                     retrieval=hit,
                 )
