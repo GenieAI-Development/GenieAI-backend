@@ -7,13 +7,11 @@ from app.observability.tracing import RequestTrace, new_request_id
 from app.observability.logging import log_event
 from app.schemas.recommendation import (
     ClarificationResponse,
-    DeliveryUnavailableResponse,
     ProductCard,
     RecommendationRequest,
     RuntimeResponse,
     SmartShoppingResponse,
     TemporaryUnavailableResponse,
-    WorkflowMismatchResponse,
 )
 from app.schemas.internal import RerankedCandidate
 from app.sessions.models import RecommendationSession, ProductSearchState
@@ -161,65 +159,6 @@ class RecommendationOrchestrator:
             )
             trace.finish("temporary_unavailable", 0, "LLM_DECISION_FAILURE")
             return response
-
-        if understanding.workflow_mismatch.detected:
-            suggested = understanding.workflow_mismatch.suggested_workflow
-            if suggested is None:
-                suggested = "gift_box" if request.request_type == "product_recommendation" else "product_recommendation"
-            response = WorkflowMismatchResponse(
-                request_id=request_id,
-                session_id=session.session_id,
-                request_type=request.request_type,
-                response_type="workflow_mismatch",
-                message="This request is better suited to the other GenieAI shopping workflow.",
-                suggested_workflow=suggested,
-            )
-            trace.finish("workflow_mismatch", 0)
-            return response
-        if understanding.clarification.required:
-            if request.request_type == "product_recommendation":
-                session.product_search_state = ProductSearchState(
-                    query_understanding=understanding.model_dump(mode="json")
-                )
-            else:
-                session.gift_box_state = gift_state
-            await self.sessions.save(session)
-            response = ClarificationResponse(
-                request_id=request_id,
-                session_id=session.session_id,
-                request_type=request.request_type,
-                response_type="clarification",
-                message=understanding.clarification.reason or "Could you provide a little more detail?",
-                missing_fields=understanding.clarification.missing_information,
-            )
-            trace.finish("clarification", 0)
-            return response
-        if understanding.delivery_request is not None:
-            try:
-                with trace.stage("delivery_validation"):
-                    available = await self.kapruka.validate_delivery(
-                        understanding.delivery_request.city,
-                        understanding.delivery_request.delivery_date.isoformat(),
-                    )
-            except Exception:
-                response = self._temporary(
-                    request_id,
-                    session,
-                    request.request_type,
-                    "I couldn't confirm delivery right now. Please try again.",
-                )
-                trace.finish("temporary_unavailable", 0, "DELIVERY_VALIDATION_UNAVAILABLE")
-                return response
-            if not available:
-                response = DeliveryUnavailableResponse(
-                    request_id=request_id,
-                    session_id=session.session_id,
-                    request_type=request.request_type,
-                    response_type="delivery_unavailable",
-                    message="Delivery isn't available for the location or date you selected.",
-                )
-                trace.finish("delivery_unavailable", 0)
-                return response
 
         try:
             categories = self.repository.list_categories()

@@ -18,13 +18,11 @@ class QueryUnderstandingService:
     ) -> QueryUnderstanding:
         system_prompt = """You are GenieAI's shared query-understanding component.
 Return only the requested structured contract. Preserve the user's exact message in
-original_query. The frontend request_type is authoritative: detect but never switch a
-clear workflow mismatch. Gift Box recipient, theme, item_count and budget range are
-not owned by this component. Classify price/stock as volatile, vendor/product/explicit
+original_query. The frontend request_type is authoritative. Gift Box recipient, theme,
+item_count and budget range are not owned by this component. Classify price/stock as volatile, vendor/product/explicit
 exact weight as stable, ordinary weight as soft, and visual/style must/must-not rules
-as mandatory semantic requirements/exclusions. Stock is always required. Ask for
-clarification only when retrieval cannot be meaningfully targeted. Delivery is a
-request-level city/date value. Do not emit confidence scores."""
+as mandatory semantic requirements/exclusions. Stock is always required. Do not emit
+confidence scores."""
         user_prompt = json.dumps(
             {
                 "request_type": request_type,
