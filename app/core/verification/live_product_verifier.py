@@ -36,7 +36,7 @@ class LiveProductVerifier:
         async def one(hit: RetrievalHit):
             async with semaphore:
                 try:
-                    payload = await self.kapruka.get_product(hit.product_id)
+                    payload = await self.kapruka.get_product(hit.product_id, hit.category)
                     price, in_stock, image_url = extract_live_product(payload)
                     description = payload.get("description")
                     if not isinstance(description, str):

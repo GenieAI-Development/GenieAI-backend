@@ -112,7 +112,7 @@ class FakeKapruka:
         self.failures = failures or set()
         self.stock = stock or {}
 
-    async def get_product(self, product_id):
+    async def get_product(self, product_id, category):
         if product_id in self.failures:
             raise RuntimeError("MCP down")
         return {

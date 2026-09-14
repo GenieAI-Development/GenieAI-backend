@@ -39,7 +39,8 @@ class SupabaseProductCache:
         if self._client is not None:
             await self._client.aclose()
 
-    async def get_product(self, product_id: str) -> dict[str, Any]:
+    async def get_product(self, product_id: str, category: str) -> dict[str, Any]:
+        """Return a cached product only when it belongs to the retrieval category."""
         if self._client is None:
             raise ProductCacheError("Supabase product cache is not configured")
         response = await self._client.get(
@@ -47,6 +48,7 @@ class SupabaseProductCache:
             params={
                 "select": "product_id,name,description,display_description,vendor,price_lkr,main_image_url,image_urls,is_active",
                 "product_id": f"eq.{product_id}",
+                "category": f"eq.{category}",
                 "limit": 1,
             },
         )
