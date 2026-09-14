@@ -20,37 +20,65 @@ class RecommendationPlanner:
             return []
         allowed = set(available_categories)
 
-        def terms(value: str) -> set[str]:
-            normalized = set()
+        def normalized_terms(value: str) -> list[str]:
+            terms = []
             for term in re.findall(r"[a-z0-9]+", value.casefold()):
                 if term.endswith("ies") and len(term) > 3:
                     term = f"{term[:-3]}y"
                 elif term.endswith("s") and not term.endswith("ss") and len(term) > 2:
                     term = term[:-1]
-                normalized.add(term)
-            return normalized
+                terms.append(term)
+            return terms
 
-        categories = []
-        for requested in scope.categories:
-            exact = next(
-                (
-                    available
-                    for available in available_categories
-                    if available.casefold() == requested.casefold()
-                ),
-                None,
-            )
-            if exact is not None:
-                categories.append(exact)
-                continue
-            requested_terms = terms(requested)
-            matches = [
-                available
-                for available in available_categories
-                if terms(available) and terms(available).issubset(requested_terms)
+        aliases = {
+            "cake": "cakes",
+            "chocolate": "chocolates",
+            "flower": "flowers",
+            "rose": "flowers",
+            "bouquet": "flowers",
+            "perfume": "perfumes",
+            "fragrance": "perfumes",
+            "cologne": "perfumes",
+        }
+        # New catalogue categories remain discoverable without requiring a
+        # code change; the final slug word acts as their default product type.
+        for available in available_categories:
+            terms = normalized_terms(available)
+            if terms:
+                aliases.setdefault(terms[-1], available)
+
+        def category_from_phrase(phrase: str) -> str | None:
+            # "Chocolate cake" is a cake: choose the final product-type word,
+            # not every category-related word in the phrase. "Cake with
+            # chocolates" likewise keeps cake as the requested product type.
+            product_phrase = re.split(r"\bwith\b|\bfilled\b|\btopped\b", phrase, maxsplit=1)[0]
+            for term in reversed(normalized_terms(product_phrase)):
+                category = aliases.get(term)
+                if category in allowed:
+                    return category
+            return None
+
+        def explicit_category_phrases(query: str) -> list[str]:
+            # Multiple retrieval categories are allowed only when the user
+            # explicitly joins product types, e.g. "cakes and chocolates".
+            if re.search(r"\b(?:and|or)\b|[,&/]", query.casefold()):
+                return [part for part in re.split(r"\b(?:and|or)\b|[,&/]", query) if part.strip()]
+            return [query]
+
+        categories = [
+            category
+            for phrase in explicit_category_phrases(understanding.original_query)
+            if (category := category_from_phrase(phrase)) is not None
+        ]
+
+        # If the user's wording has no known product-type term, use the
+        # structured category scope produced by query understanding.
+        if not categories:
+            categories = [
+                category
+                for requested in scope.categories
+                if (category := category_from_phrase(requested)) is not None
             ]
-            if len(matches) == 1:
-                categories.append(matches[0])
         categories = list(dict.fromkeys(categories))
 
         if not categories:
@@ -64,8 +92,11 @@ class RecommendationPlanner:
 
             selection = await self.executor.execute(
                 system_prompt=(
-                    "Select 3-5 semantically relevant catalogue categories for the full "
-                    "shopping query. Select only values from available_categories."
+                    "Select one or more semantically relevant catalogue categories for the full "
+                    "shopping query. Select only values from available_categories. "
+                    "Select the product type, not descriptive modifiers: a chocolate "
+                    "cake belongs to cakes, not chocolates. Select multiple categories "
+                    "only when the user explicitly requests multiple product types."
                 ),
                 user_prompt=json.dumps(
                     {
