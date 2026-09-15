@@ -6,7 +6,9 @@ from app.integrations.llm.reliable_executor import ReliableLLMExecutor
 from app.schemas.internal import QueryUnderstanding
 
 
-class QueryUnderstandingService:
+class QueryUnderstandingAgent:
+    """Supervised agent responsible only for shared query understanding."""
+
     def __init__(self, executor: ReliableLLMExecutor) -> None:
         self.executor = executor
 
@@ -45,3 +47,7 @@ confidence scores."""
         )
         result.volatile_constraints.requires_in_stock = True
         return result
+
+
+# Backwards-compatible import for callers outside the application container.
+QueryUnderstandingService = QueryUnderstandingAgent

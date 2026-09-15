@@ -370,6 +370,10 @@ A temporary infrastructure failure must not overwrite the last known valid recom
 
 # 7. Query Understanding
 
+Query Understanding is implemented as a supervised decision agent. It has no
+authority to retrieve or select products, and its typed output is validated by
+the decision-agent supervisor before Recommendation Planning consumes it.
+
 ## 7.1 Responsibility
 
 Query Understanding:
@@ -728,6 +732,12 @@ If the MCP later supports true product-level delivery checking, delivery eligibi
 ---
 
 # 12. Recommendation Planning
+
+Recommendation Planning is implemented as a supervised decision agent. It
+consumes only validated Query Understanding output and returns typed retrieval
+plans. The supervisor validates category membership and original-query
+preservation at this handoff. The central Recommendation Orchestrator retains
+the fixed pipeline order; neither agent routes or invokes downstream services.
 
 The Planner creates retrieval instructions but does not execute retrieval.
 

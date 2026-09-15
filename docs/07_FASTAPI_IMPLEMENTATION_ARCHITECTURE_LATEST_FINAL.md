@@ -99,6 +99,7 @@ genieai-backend/
 │   │   └── gift_box_optimizer.py
 │   │
 │   ├── orchestration/
+│   │   ├── decision_agent_supervisor.py
 │   │   └── recommendation_orchestrator.py
 │   │
 │   ├── sessions/
@@ -491,9 +492,13 @@ LLMs must not override optimizer constraints.
 
 ```text
 recommendation_orchestrator.py
+decision_agent_supervisor.py
 ```
 
-Owns only stage ordering and branching.
+The Recommendation Orchestrator owns stage ordering and branching. The
+Decision Agent Supervisor runs and validates only the Query Understanding and
+Recommendation Planning agent handoffs. It does not route requests or invoke
+retrieval, verification, reranking, or workflow code.
 
 Conceptually:
 

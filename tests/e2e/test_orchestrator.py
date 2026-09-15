@@ -3,6 +3,7 @@ import pytest
 from app.core.planning.recommendation_planner import RecommendationPlanner
 from app.optimizers.gift_box_optimizer import GiftBoxOptimizer
 from app.orchestration.recommendation_orchestrator import RecommendationOrchestrator
+from app.orchestration.decision_agent_supervisor import DecisionAgentSupervisor
 from app.repositories.catalogue_repository import JsonCatalogueRepository
 from app.schemas.catalogue import CategoryCatalogue, CatalogueProduct
 from app.schemas.internal import (
@@ -87,9 +88,11 @@ def make_orchestrator(tmp_path):
     orchestrator = RecommendationOrchestrator(
         sessions=sessions,
         repository=repository,
-        query_understanding=QueryService(),
+        decision_agents=DecisionAgentSupervisor(
+            query_agent=QueryService(),
+            planning_agent=RecommendationPlanner(NoopExecutor()),
+        ),
         gift_box_context=GiftBoxContextResolver(),
-        planner=RecommendationPlanner(NoopExecutor()),
         retriever=Retriever(),
         verifier=Verifier(product),
         reranker=Reranker(),

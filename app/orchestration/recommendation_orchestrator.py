@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from app.integrations.llm.reliable_executor import LLMDecisionError
+from app.orchestration.decision_agent_supervisor import DecisionAgentError
 from app.observability.tracing import RequestTrace, new_request_id
 from app.observability.logging import log_event
 from app.schemas.recommendation import (
@@ -26,9 +27,8 @@ class RecommendationOrchestrator:
         *,
         sessions,
         repository,
-        query_understanding,
+        decision_agents,
         gift_box_context,
-        planner,
         retriever,
         verifier,
         reranker,
@@ -40,9 +40,8 @@ class RecommendationOrchestrator:
     ) -> None:
         self.sessions = sessions
         self.repository = repository
-        self.query_understanding = query_understanding
+        self.decision_agents = decision_agents
         self.gift_box_context = gift_box_context
-        self.planner = planner
         self.retriever = retriever
         self.verifier = verifier
         self.reranker = reranker
@@ -147,10 +146,10 @@ class RecommendationOrchestrator:
         )
         try:
             with trace.stage("query_understanding"):
-                understanding = await self.query_understanding.understand(
+                understanding = await self.decision_agents.understand(
                     request.message, request.request_type, previous
                 )
-        except LLMDecisionError:
+        except (LLMDecisionError, DecisionAgentError):
             response = self._temporary(
                 request_id,
                 session,
@@ -173,8 +172,8 @@ class RecommendationOrchestrator:
             return response
         try:
             with trace.stage("recommendation_planning"):
-                plans = await self.planner.plan(understanding, categories)
-        except LLMDecisionError:
+                plans = await self.decision_agents.plan(understanding, categories)
+        except (LLMDecisionError, DecisionAgentError):
             response = self._temporary(
                 request_id, session, request.request_type, "I couldn't plan the search reliably right now."
             )

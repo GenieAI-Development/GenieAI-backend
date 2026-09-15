@@ -7,7 +7,9 @@ from app.integrations.llm.reliable_executor import ReliableLLMExecutor
 from app.schemas.internal import CategorySelection, QueryUnderstanding, RetrievalPlan
 
 
-class RecommendationPlanner:
+class PlanningAgent:
+    """Supervised agent that converts understood intent into retrieval plans."""
+
     def __init__(self, executor: ReliableLLMExecutor, fused_top_k: int = 20) -> None:
         self.executor = executor
         self.fused_top_k = fused_top_k
@@ -120,3 +122,7 @@ class RecommendationPlanner:
             )
             for category in categories
         ]
+
+
+# Backwards-compatible import for callers outside the application container.
+RecommendationPlanner = PlanningAgent

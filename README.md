@@ -13,8 +13,8 @@ selection:
 ```text
 validated request + session
   -> Gift Box context resolution (gift_box only)
-  -> shared query understanding
-  -> category planning
+  -> supervised Query Understanding Agent
+  -> supervised Planning Agent
   -> Dense/Qdrant + BM25 retrieval
   -> reciprocal-rank fusion
   -> live Kapruka verification
@@ -45,6 +45,11 @@ app/sessions/        replaceable session abstraction and in-memory V1 store
 app/observability/   structured events and request/stage timing
 tests/               unit, integration, and end-to-end tests
 ```
+
+The two LLM decision stages are supervised agents with typed handoffs. The
+deterministic orchestrator remains responsible for their order and failure
+propagation; retrieval, verification, and response construction remain normal
+services and do not gain autonomous behavior.
 
 The frozen design decisions are in `docs/01_...md` through `docs/08_...md`.
 

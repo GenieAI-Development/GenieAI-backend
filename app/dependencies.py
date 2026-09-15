@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.config.settings import Settings
-from app.core.planning.recommendation_planner import RecommendationPlanner
-from app.core.query_understanding.service import QueryUnderstandingService
+from app.core.planning.recommendation_planner import PlanningAgent
+from app.core.query_understanding.service import QueryUnderstandingAgent
 from app.core.response_generation.service import ResponseGenerator
 from app.core.reranking.reranker import SemanticReranker
 from app.core.retrieval.bm25_retriever import BM25Retriever
@@ -24,6 +24,7 @@ from app.integrations.qdrant.client import QdrantVectorStore
 from app.integrations.supabase.product_cache import SupabaseProductCache
 from app.optimizers.gift_box_optimizer import GiftBoxOptimizer
 from app.orchestration.recommendation_orchestrator import RecommendationOrchestrator
+from app.orchestration.decision_agent_supervisor import DecisionAgentSupervisor
 from app.repositories.catalogue_repository import JsonCatalogueRepository
 from app.sessions.store import InMemorySessionStore
 from app.workflows.gift_box.context_resolver import GiftBoxContextResolver
@@ -103,12 +104,15 @@ def build_container(settings: Settings) -> Container:
         settings.rrf_k,
     )
     response_generator = ResponseGenerator()
+    decision_agents = DecisionAgentSupervisor(
+        query_agent=QueryUnderstandingAgent(executor),
+        planning_agent=PlanningAgent(executor, settings.fused_top_k),
+    )
     orchestrator = RecommendationOrchestrator(
         sessions=sessions,
         repository=repository,
-        query_understanding=QueryUnderstandingService(executor),
+        decision_agents=decision_agents,
         gift_box_context=GiftBoxContextResolver(),
-        planner=RecommendationPlanner(executor, settings.fused_top_k),
         retriever=hybrid,
         verifier=LiveProductVerifier(
             product_cache,
