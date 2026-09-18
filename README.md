@@ -71,6 +71,7 @@ Copy `.env.example` to `.env` and configure at least:
 
 ```dotenv
 OPENAI_API_KEY=...
+GROQ_TOKEN=...
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=
 KAPRUKA_MCP_URL=https://mcp.kapruka.com/mcp

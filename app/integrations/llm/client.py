@@ -21,8 +21,18 @@ class StructuredLLMClient(Protocol):
 
 
 class OpenAIStructuredLLMClient:
-    def __init__(self, api_key: str, timeout_seconds: float = 30.0) -> None:
-        self.client = AsyncOpenAI(api_key=api_key, timeout=timeout_seconds, max_retries=0)
+    def __init__(
+        self,
+        api_key: str,
+        timeout_seconds: float = 30.0,
+        base_url: str | None = None,
+    ) -> None:
+        self.client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout_seconds,
+            max_retries=0,
+        )
 
     async def complete(
         self,
@@ -47,5 +57,24 @@ class OpenAIStructuredLLMClient:
 
 
 class UnavailableLLMClient:
+    def __init__(self, required_setting: str = "OPENAI_API_KEY") -> None:
+        self.required_setting = required_setting
+
     async def complete(self, **kwargs):
-        raise RuntimeError("OPENAI_API_KEY is not configured")
+        raise RuntimeError(f"{self.required_setting} is not configured")
+
+
+class ModelRoutingLLMClient:
+    """Routes explicitly configured models to a provider-specific client."""
+
+    def __init__(
+        self,
+        routes: dict[str, StructuredLLMClient],
+        default_client: StructuredLLMClient,
+    ) -> None:
+        self.routes = routes
+        self.default_client = default_client
+
+    async def complete(self, **kwargs):
+        client = self.routes.get(kwargs["model"], self.default_client)
+        return await client.complete(**kwargs)

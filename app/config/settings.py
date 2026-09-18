@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     )
 
     openai_api_key: str | None = None
+    groq_token: str | None = None
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str | None = None
     supabase_url: str | None = Field(
@@ -46,6 +47,7 @@ class Settings(BaseSettings):
     rrf_k: int = 60
     max_smart_shopping_products: int = 12
 
+    groq_primary_model: str = "openai/gpt-oss-20b"
     llm_primary_model: str = "gpt-4.1-mini"
     llm_fallback_models: list[str] = Field(default_factory=lambda: ["gpt-5-mini"])
     llm_max_attempts_per_model: int = 2

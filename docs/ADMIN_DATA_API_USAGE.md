@@ -359,6 +359,7 @@ services to be configured in `.env`:
 
 ```dotenv
 OPENAI_API_KEY=your-openai-key
+GROQ_TOKEN=your-groq-token
 QDRANT_URL=https://your-cluster.region.cloud.qdrant.io:6333
 QDRANT_API_KEY=your-qdrant-cloud-api-key
 KAPRUKA_MCP_URL=https://mcp.kapruka.com/mcp

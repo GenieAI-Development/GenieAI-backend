@@ -18,7 +18,11 @@ from app.indexing.qdrant_indexer import QdrantIndexer
 from app.ingestion.product_ingestion import ProductIngestion
 from app.ingestion.visual_interpretation_import import VisualInterpretationImporter
 from app.integrations.kapruka.client import McpKaprukaClient
-from app.integrations.llm.client import OpenAIStructuredLLMClient, UnavailableLLMClient
+from app.integrations.llm.client import (
+    ModelRoutingLLMClient,
+    OpenAIStructuredLLMClient,
+    UnavailableLLMClient,
+)
 from app.integrations.llm.reliable_executor import ReliableLLMExecutor
 from app.integrations.qdrant.client import QdrantVectorStore
 from app.integrations.supabase.product_cache import SupabaseProductCache
@@ -83,16 +87,31 @@ def build_container(settings: Settings) -> Container:
             settings.embedding_dimension,
             settings.openai_timeout_seconds,
         )
-        llm_client = OpenAIStructuredLLMClient(
+        openai_llm_client = OpenAIStructuredLLMClient(
             settings.openai_api_key, settings.openai_timeout_seconds
         )
     else:
         embeddings = UnavailableEmbeddingClient()
-        llm_client = UnavailableLLMClient()
+        openai_llm_client = UnavailableLLMClient()
+    if settings.groq_token:
+        groq_llm_client = OpenAIStructuredLLMClient(
+            settings.groq_token,
+            settings.openai_timeout_seconds,
+            base_url="https://api.groq.com/openai/v1",
+        )
+    else:
+        groq_llm_client = UnavailableLLMClient("GROQ_TOKEN")
+    llm_client = ModelRoutingLLMClient(
+        {settings.groq_primary_model: groq_llm_client},
+        default_client=openai_llm_client,
+    )
+    fallback_models = list(
+        dict.fromkeys([settings.llm_primary_model, *settings.llm_fallback_models])
+    )
     executor = ReliableLLMExecutor(
         llm_client,
-        settings.llm_primary_model,
-        settings.llm_fallback_models,
+        settings.groq_primary_model,
+        fallback_models,
         settings.llm_max_attempts_per_model,
     )
     bm25_indexer = BM25Indexer(settings.bm25_dir)

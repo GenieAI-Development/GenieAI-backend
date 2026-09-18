@@ -8,6 +8,7 @@ from app.core.verification.live_product_verifier import (
     LiveVerificationUnavailableError,
 )
 from app.integrations.llm.reliable_executor import LLMDecisionError, ReliableLLMExecutor
+from app.integrations.llm.client import ModelRoutingLLMClient
 from app.optimizers.gift_box_optimizer import GiftBoxOptimizer
 from app.repositories.catalogue_repository import JsonCatalogueRepository
 from app.schemas.catalogue import CategoryCatalogue, CatalogueProduct
@@ -64,6 +65,34 @@ class SequenceLLM:
         if isinstance(result, Exception):
             raise result
         return result
+
+
+@pytest.mark.asyncio
+async def test_model_router_uses_groq_for_primary_and_openai_for_fallback():
+    groq = SequenceLLM([RuntimeError("Groq unavailable")])
+    openai = SequenceLLM(
+        [
+            RerankOutput(
+                decisions=[
+                    RerankDecision(
+                        product_id="A", eligible=True, relevance_score=0.9, reason="Match"
+                    )
+                ]
+            )
+        ]
+    )
+    router = ModelRoutingLLMClient({"openai/gpt-oss-20b": groq}, openai)
+    executor = ReliableLLMExecutor(
+        router, "openai/gpt-oss-20b", ["gpt-4.1-mini"], attempts_per_model=1
+    )
+
+    result = await executor.execute(
+        system_prompt="s", user_prompt="u", response_model=RerankOutput
+    )
+
+    assert result.decisions[0].product_id == "A"
+    assert groq.models == ["openai/gpt-oss-20b"]
+    assert openai.models == ["gpt-4.1-mini"]
 
 
 @pytest.mark.asyncio
